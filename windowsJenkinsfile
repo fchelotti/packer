@@ -1,0 +1,42 @@
+pipeline {
+    agent {
+        label "sul-packer"
+    }
+    
+    stages {
+
+        stage('Clone_Repo') {
+            steps {
+                container('packer') {
+                    git credentialsId: 'bitbucket_token', url: 'https://github.com/fchelotti/packer.git'
+                }
+            }
+        }
+
+        stage('Pre_Build') {
+            steps {
+                container('packer') {
+                    sh 'packer version'
+                    sh 'echo "192.168.200.245 [informe a url do vcenter]" >> /etc/hosts'
+                }
+            }
+        }
+
+        stage('Build_Image') {
+            options {
+            timeout(time: 15, unit: 'MINUTES')
+            }
+
+            steps {
+                container('packer') {
+                    dir('windows/Windows2019') {
+                        timeout(time: 15, unit: 'MINUTES') {
+                            sh 'packer init .'
+                            sh 'packer build -force .'
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

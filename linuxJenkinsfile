@@ -1,0 +1,61 @@
+pipeline {
+    agent {
+        label "sul-packer"
+    }
+    
+    options {
+      ansiColor("xterm")
+    }
+
+    stages {
+
+        stage('Clone_Repo') {
+            steps {
+                container('packer') {
+                    git credentialsId: 'bitbucket_token', url: 'https://github.com/fchelotti/packer.git', branch: 'feature/packer_cloudinit'
+                }
+            }
+        }
+
+        stage('Pre_Build') {
+            steps {
+                container('packer') {
+                    sh 'packer version'
+                    sh 'echo "192.168.200.245 [informe a url do vcenter]" >> /etc/hosts'
+                }
+            }
+        }
+
+        stage('Build_Image') {
+            options {
+            timeout(time: 15, unit: 'MINUTES')
+            }
+
+            steps {
+                container('packer') {
+                    dir('linux/redhat_8') {
+                        timeout(time: 15, unit: 'MINUTES') {
+                            sh 'packer init .'
+                            sh 'packer build -force .'
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('Post_Build') {
+            environment {
+                ARTIFACT_ID = credentials('artifact_id')
+            }
+            steps {
+                container('packer') {
+                    dir('linux/redhat_8/manifests') {
+                        sh '''
+                        ARTIFACT_ID=$(grep -Po 'artifact_id":\K.*(?=,)' $(ls -Art |tail -n1))
+                        '''
+                    }
+                }
+            }
+        }
+    }
+}
